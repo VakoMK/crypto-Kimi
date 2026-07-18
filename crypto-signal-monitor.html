@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔮 Live Crypto Signal Monitor</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0e1a;color:#e0e0e0;min-height:100vh;padding:16px}
+  .container{max-width:900px;margin:0 auto}
+  .header{text-align:center;padding:20px 0;border-bottom:2px solid #1a237e;margin-bottom:20px}
+  .header h1{color:#ffd700;margin:0;font-size:28px;text-shadow:0 0 15px rgba(255,215,0,.4)}
+  .header p{color:#90a4ae;margin:8px 0 0;font-size:13px}
+  .status-bar{display:flex;gap:12px;justify-content:center;margin-bottom:16px;flex-wrap:wrap}
+  .status-pill{padding:6px 14px;border-radius:20px;font-size:12px;background:#12182b;border:1px solid #1a237e}
+  .status-pill.live{border-color:#00e676;color:#00e676;animation:pulse 2s infinite}
+  .status-pill.error{border-color:#ff5252;color:#ff5252}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:12px;background:#12182b;border-radius:10px;justify-content:center}
+  .btn{padding:8px 16px;border:1px solid #283593;background:#1a237e;color:#c5cae9;border-radius:8px;cursor:pointer;font-size:12px;transition:all .2s}
+  .btn:hover{background:#283593}
+  .btn.active{background:#ffd700;color:#0a0e1a;border-color:#ffd700;font-weight:bold}
+  .btn.danger{background:#b71c1c;border-color:#ff5252;color:#ff8a80}
+  .btn.danger:hover{background:#ff5252;color:#fff}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:20px}
+  .price-card{background:#12182b;border:1px solid #1a237e;border-radius:10px;padding:12px;transition:all .2s}
+  .price-card:hover{border-color:#ffd700}
+  .price-card.hot{border-color:#ff5252;box-shadow:0 0 10px rgba(255,82,82,.2)}
+  .price-card.cold{border-color:#00e676;box-shadow:0 0 10px rgba(0,230,118,.2)}
+  .pair-name{font-size:14px;font-weight:bold;color:#fff;margin-bottom:4px}
+  .price-value{font-size:18px;font-weight:bold;font-family:'Courier New',monospace;color:#ffd700}
+  .change-pos{color:#00e676;font-size:12px}
+  .change-neg{color:#ff5252;font-size:12px}
+  .signal-card{background:#12182b;border:1px solid #1a237e;border-radius:12px;padding:16px;margin-bottom:12px;position:relative;overflow:hidden}
+  .signal-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+  .signal-card.short::before{background:#ff5252;box-shadow:0 0 10px rgba(255,82,82,.5)}
+  .signal-card.long::before{background:#00e676;box-shadow:0 0 10px rgba(0,230,118,.5)}
+  .signal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .direction-badge{padding:4px 12px;border-radius:12px;font-size:11px;font-weight:bold;text-transform:uppercase}
+  .dir-short{background:#b71c1c;color:#ff8a80}
+  .dir-long{background:#1b5e20;color:#69f0ae}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .field{background:#0d1b2a;padding:8px 10px;border-radius:6px;border:1px solid #1a237e}
+  .field-label{font-size:10px;color:#78909c;text-transform:uppercase;letter-spacing:.5px}
+  .field-value{font-size:14px;font-weight:bold;font-family:'Courier New',monospace}
+  .val-entry{color:#ffd700}.val-stop{color:#ff5252}.val-target{color:#00e676}.val-lev{color:#82b1ff}
+  .targets{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+  .target-box{background:#0d1b2a;padding:6px;border-radius:6px;border:1px solid #1a237e;text-align:center}
+  .target-hit{border-color:#00e676!important;background:#1b5e20!important}
+  .t-label{font-size:9px;color:#78909c}.t-price{font-size:12px;font-weight:bold;color:#00e676;font-family:'Courier New',monospace}
+  .monitor-bar{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px;background:#0d1b2a;border-radius:6px}
+  .monitor-status{font-size:11px}.mon-active{color:#00e676}.mon-closed{color:#ff5252}.mon-pending{color:#ffd700}
+  .progress-track{flex:1;height:4px;background:#0d1b2a;border-radius:2px;margin:0 10px;overflow:hidden}
+  .progress-fill{height:100%;border-radius:2px;transition:width .5s}
+  .pnl-pos{color:#00e676}.pnl-neg{color:#ff5252}
+  .analytics{background:#12182b;border:1px solid #1a237e;border-radius:10px;padding:14px;margin-bottom:16px}
+  .analytics h3{color:#ffd700;margin:0 0 10px;font-size:14px}
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px}
+  .stat-box{text-align:center;padding:8px;background:#0d1b2a;border-radius:6px}
+  .stat-num{font-size:20px;font-weight:bold;color:#ffd700}
+  .stat-label{font-size:10px;color:#78909c;margin-top:2px}
+  .recommendation{background:linear-gradient(135deg,#1a237e,#0d1b2a);border:1px solid #ffd700;border-radius:10px;padding:12px;margin-bottom:16px}
+  .rec-title{color:#ffd700;font-size:14px;margin:0 0 6px}
+  .rec-text{color:#c5cae9;font-size:12px;line-height:1.5;margin:0}
+  .log-area{background:#0d1b2a;border:1px solid #1a237e;border-radius:8px;padding:10px;margin-top:16px;max-height:200px;overflow-y:auto;font-size:11px;font-family:'Courier New',monospace;color:#90a4ae}
+  .log-entry{margin:2px 0;padding:2px 0;border-bottom:1px solid #1a237e}
+  .log-time{color:#546e7a}.log-msg{color:#e0e0e0}
+  .hidden{display:none!important}
+  .section-title{color:#82b1ff;font-size:13px;margin:20px 0 10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #1a237e;padding-bottom:6px}
+  .indicator-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .ind-tag{padding:3px 8px;border-radius:4px;font-size:10px;background:#0d1b2a;border:1px solid #37474f}
+  .ind-bull{border-color:#2e7d32;color:#69f0ae}.ind-bear{border-color:#b71c1c;color:#ff8a80}.ind-neut{color:#90a4ae}
+  .disclaimer{background:#1a237e;border:1px solid #283593;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#90a4ae;text-align:center}
+  .disclaimer strong{color:#ffd700}
+  .storage-info{background:#0d1b2a;border:1px solid #1a237e;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:#90a4ae;text-align:center}
+  .storage-info strong{color:#00e676}
+  @media(max-width:600px){.grid{grid-template-columns:repeat(2,1fr)}.field-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🔮 Live Crypto Signal Monitor</h1>
+    <p>Real-time via CoinGecko API (public-apis) • Technical Analysis • Persistent History</p>
+  </div>
+
+  <div class="disclaimer">
+    <strong>⚠️ NOT FINANCIAL ADVICE</strong> — Demo signals for educational purposes. DYOR.
+  </div>
+
+  <div class="storage-info" id="storage-info">
+    💾 <strong>History is saved locally</strong> in your browser. It persists across reloads.
+    <span id="storage-size" style="color:#ffd700"></span>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-pill live" id="status-pill">● LIVE — 60s refresh</div>
+    <div class="status-pill" id="last-update">Last update: --</div>
+    <div class="status-pill" id="api-status">API: Connecting...</div>
+  </div>
+
+  <div class="recommendation">
+    <h3 class="rec-title">🧠 AI Recommendation Engine</h3>
+    <p class="rec-text" id="ai-rec">Initializing... Waiting for market data and signal history.</p>
+  </div>
+
+  <div class="controls">
+    <button class="btn active" onclick="showTab('prices')">💰 Live Prices</button>
+    <button class="btn" onclick="showTab('signals')">🎯 Active Signals</button>
+    <button class="btn" onclick="showTab('history')">📊 History & Analytics</button>
+    <button class="btn" onclick="forceRefresh()">🔄 Refresh Now</button>
+    <button class="btn danger" onclick="clearHistory()">🗑️ Clear History</button>
+    <button class="btn" onclick="exportHistory()">📤 Export JSON</button>
+  </div>
+
+  <div id="tab-prices">
+    <div class="section-title">Live Market Prices (CoinGecko)</div>
+    <div class="grid" id="prices-grid"></div>
+  </div>
+
+  <div id="tab-signals" class="hidden">
+    <div class="section-title">Active Signals — Real-time Monitoring</div>
+    <div id="signals-list"></div>
+  </div>
+
+  <div id="tab-history" class="hidden">
+    <div class="section-title">Signal History & Performance Analytics</div>
+    <div class="analytics">
+      <h3>📈 Performance Metrics</h3>
+      <div class="stats-row">
+        <div class="stat-box"><div class="stat-num" id="total-signals">0</div><div class="stat-label">Total Signals</div></div>
+        <div class="stat-box"><div class="stat-num" id="win-rate">0%</div><div class="stat-label">Win Rate</div></div>
+        <div class="stat-box"><div class="stat-num" id="avg-rr">0</div><div class="stat-label">Avg R:R</div></div>
+        <div class="stat-box"><div class="stat-num" id="avg-pnl">0%</div><div class="stat-label">Avg PnL</div></div>
+        <div class="stat-box"><div class="stat-num" id="best-pair">-</div><div class="stat-label">Best Pair</div></div>
+      </div>
+    </div>
+    <div id="history-list"></div>
+  </div>
+
+  <div class="log-area" id="log-area">
+    <div class="log-entry"><span class="log-time">[INIT]</span> <span class="log-msg">System initialized. Loading history from localStorage...</span></div>
+  </div>
+</div>
+
+<script>
+// ========== CONFIGURATION ==========
+const COINS = {
+  'bitcoin':'BTC','ethereum':'ETH','solana':'SOL','binancecoin':'BNB',
+  'ripple':'XRP','cardano':'ADA','dogecoin':'DOGE','polkadot':'DOT',
+  'chainlink':'LINK','avalanche-2':'AVAX','matic-network':'MATIC','uniswap':'UNI',
+  'internet-computer':'ICP','near':'NEAR','aptos':'APT','render-token':'RNDR',
+  'fetch-ai':'FET','sei-network':'SEI','sui':'SUI','pepe':'PEPE'
+};
+const COIN_IDS = Object.keys(COINS).join(',');
+const UPDATE_INTERVAL = 60000;
+const SIGNAL_INTERVAL = 300000;
+const STORAGE_KEY = 'crypto_signal_history_v1';
+
+// ========== STATE ==========
+let prices = {};
+let histories = {};
+let activeSignals = [];
+let signalHistory = [];
+let lastSignalGen = 0;
+let isRunning = false;
+
+// ========== LOCAL STORAGE ==========
+function saveHistory() {
+  try {
+    const data = JSON.stringify(signalHistory);
+    localStorage.setItem(STORAGE_KEY, data);
+    updateStorageInfo();
+  } catch (e) {
+    log('Storage save error: ' + e.message);
+  }
+}
+
+function loadHistory() {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (data) {
+      signalHistory = JSON.parse(data);
+      log(`📂 Loaded ${signalHistory.length} signals from localStorage`);
+      updateAnalytics();
+      updateAIRecommendation();
+    } else {
+      log('📂 No saved history found. Starting fresh.');
+    }
+  } catch (e) {
+    log('Storage load error: ' + e.message);
+    signalHistory = [];
+  }
+}
+
+function clearHistory() {
+  if (!confirm('Are you sure you want to delete ALL signal history? This cannot be undone.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  signalHistory = [];
+  updateAnalytics();
+  renderHistory();
+  updateAIRecommendation();
+  log('🗑️ History cleared from localStorage');
+}
+
+function exportHistory() {
+  const dataStr = JSON.stringify(signalHistory, null, 2);
+  const blob = new Blob([dataStr], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `crypto_signals_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  log('📤 History exported to JSON file');
+}
+
+function updateStorageInfo() {
+  const info = document.getElementById('storage-size');
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (data) {
+      const sizeKB = (data.length / 1024).toFixed(1);
+      info.textContent = ` | Saved: ${signalHistory.length} signals (${sizeKB} KB)`;
+    } else {
+      info.textContent = '';
+    }
+  } catch (e) {
+    info.textContent = '';
+  }
+}
+
+// ========== LOGGING ==========
+function log(msg) {
+  const area = document.getElementById('log-area');
+  const time = new Date().toLocaleTimeString('en-US',{hour12:false});
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-msg">${msg}</span>`;
+  area.insertBefore(entry, area.firstChild);
+  if (area.children.length > 50) area.removeChild(area.lastChild);
+}
+
+// ========== TECHNICAL ANALYSIS ==========
+function sma(data, period) {
+  if (data.length < period) return null;
+  const slice = data.slice(-period);
+  return slice.reduce((a,b)=>a+b,0)/period;
+}
+
+function ema(data, period) {
+  if (data.length < period) return null;
+  const k = 2/(period+1);
+  let ema = sma(data.slice(0,period), period);
+  for (let i = period; i < data.length; i++) {
+    ema = data[i] * k + ema * (1-k);
+  }
+  return ema;
+}
+
+function rsi(data, period=14) {
+  if (data.length < period+1) return null;
+  let gains=0, losses=0;
+  for (let i=data.length-period; i<data.length; i++) {
+    const change = data[i] - data[i-1];
+    if (change > 0) gains += change; else losses -= change;
+  }
+  if (losses === 0) return 100;
+  const rs = gains/losses;
+  return 100 - (100/(1+rs));
+}
+
+function bollinger(data, period=20, mult=2) {
+  const ma = sma(data, period);
+  if (!ma) return null;
+  const slice = data.slice(-period);
+  const variance = slice.reduce((a,b)=>a+Math.pow(b-ma,2),0)/period;
+  const std = Math.sqrt(variance);
+  return {upper: ma + mult*std, middle: ma, lower: ma - mult*std};
+}
+
+function macd(data, fast=12, slow=26, signal=9) {
+  if (data.length < slow+signal) return null;
+  const emaFast = ema(data, fast);
+  const emaSlow = ema(data, slow);
+  if (!emaFast || !emaSlow) return null;
+  const macdLine = emaFast - emaSlow;
+  const macdSeries = [];
+  for (let i = slow; i < data.length; i++) {
+    const ef = ema(data.slice(0,i+1), fast);
+    const es = ema(data.slice(0,i+1), slow);
+    if (ef && es) macdSeries.push(ef - es);
+  }
+  const signalLine = ema(macdSeries, signal);
+  return {macd: macdLine, signal: signalLine, histogram: macdLine - (signalLine||0)};
+}
+
+// ========== PRICE FETCHING ==========
+async function fetchPrices() {
+  try {
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${COIN_IDS}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    prices = data;
+    document.getElementById('api-status').textContent = 'API: Connected ✅';
+    document.getElementById('api-status').style.borderColor = '#00e676';
+    document.getElementById('api-status').style.color = '#00e676';
+    document.getElementById('last-update').textContent = 'Last update: ' + new Date().toLocaleTimeString();
+    log('Price data updated');
+    renderPrices();
+    updateHistories();
+    monitorSignals();
+    return true;
+  } catch (e) {
+    document.getElementById('api-status').textContent = 'API: Error ❌';
+    document.getElementById('api-status').style.borderColor = '#ff5252';
+    document.getElementById('api-status').style.color = '#ff5252';
+    log('Price fetch error: ' + e.message);
+    return false;
+  }
+}
+
+async function fetchHistory(coinId) {
+  try {
+    const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=30&interval=daily`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.prices.map(p => p[1]);
+  } catch (e) {
+    return null;
+  }
+}
+
+async function updateHistories() {
+  for (const [id, symbol] of Object.entries(COINS)) {
+    if (!histories[id] || histories[id].length < 30) {
+      const hist = await fetchHistory(id);
+      if (hist) histories[id] = hist;
+    } else {
+      const current = prices[id]?.usd;
+      if (current) histories[id].push(current);
+      if (histories[id].length > 60) histories[id].shift();
+    }
+  }
+}
+
+// ========== RENDER PRICES ==========
+function renderPrices() {
+  const grid = document.getElementById('prices-grid');
+  let html = '';
+  for (const [id, symbol] of Object.entries(COINS)) {
+    const p = prices[id];
+    if (!p) continue;
+    const change = p.usd_24h_change || 0;
+    const cls = change > 3 ? 'hot' : change < -3 ? 'cold' : '';
+    const chgCls = change >= 0 ? 'change-pos' : 'change-neg';
+    const chgIcon = change >= 0 ? '▲' : '▼';
+    html += `
+      <div class="price-card ${cls}">
+        <div class="pair-name">${symbol}/USDT</div>
+        <div class="price-value">$${p.usd.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:6})}</div>
+        <div class="${chgCls}">${chgIcon} ${Math.abs(change).toFixed(2)}% (24h)</div>
+        <div style="font-size:10px;color:#546e7a;margin-top:4px">Vol: $${((p.usd_24h_vol||0)/1e9).toFixed(2)}B</div>
+      </div>
+    `;
+  }
+  grid.innerHTML = html;
+}
+
+// ========== SIGNAL GENERATION ==========
+function generateSignals() {
+  const now = Date.now();
+  if (now - lastSignalGen < SIGNAL_INTERVAL) return;
+  lastSignalGen = now;
+
+  let newSignals = [];
+  for (const [id, symbol] of Object.entries(COINS)) {
+    const hist = histories[id];
+    const price = prices[id]?.usd;
+    if (!hist || hist.length < 30 || !price) continue;
+
+    const r = rsi(hist);
+    const bb = bollinger(hist);
+    const m = macd(hist);
+    const ema20 = ema(hist, 20);
+    const ema50 = ema(hist, 50);
+
+    if (!r || !bb || !m || !ema20 || !ema50) continue;
+
+    let direction = null;
+    let confidence = 0;
+    let indicators = [];
+
+    if (r < 35 && price < bb.lower * 1.02) {
+      direction = 'Long';
+      confidence += 30;
+      indicators.push('RSI oversold');
+    }
+    if (m.macd > m.signal && m.histogram > 0) {
+      if (direction === 'Long') confidence += 25;
+      indicators.push('MACD bullish');
+    }
+    if (ema20 > ema50 && price > ema20) {
+      if (direction === 'Long') confidence += 20;
+      indicators.push('EMA trend up');
+    }
+    if (price <= bb.lower) {
+      if (direction === 'Long') confidence += 15;
+      indicators.push('BB lower touch');
+    }
+
+    if (r > 65 && price > bb.upper * 0.98) {
+      direction = 'Short';
+      confidence += 30;
+      indicators.push('RSI overbought');
+    }
+    if (m.macd < m.signal && m.histogram < 0) {
+      if (direction === 'Short') confidence += 25;
+      indicators.push('MACD bearish');
+    }
+    if (ema20 < ema50 && price < ema20) {
+      if (direction === 'Short') confidence += 20;
+      indicators.push('EMA trend down');
+    }
+    if (price >= bb.upper) {
+      if (direction === 'Short') confidence += 15;
+      indicators.push('BB upper touch');
+    }
+
+    if (!direction || confidence < 50) continue;
+
+    const volatility = (bb.upper - bb.lower) / bb.middle;
+    const atrVal = (bb.upper - bb.lower) / 4;
+
+    let entry = price;
+    let stop, targets = [];
+    let leverage = Math.min(Math.floor(2/volatility), 20);
+    leverage = Math.max(leverage, 3);
+
+    if (direction === 'Long') {
+      stop = entry - atrVal * 1.5;
+      for (let i=1; i<=4; i++) targets.push(entry + atrVal * (0.8 + i*0.6));
+    } else {
+      stop = entry + atrVal * 1.5;
+      for (let i=1; i<=4; i++) targets.push(entry - atrVal * (0.8 + i*0.6));
+    }
+
+    const risk = Math.abs((stop-entry)/entry*100);
+    const reward = Math.abs((targets[3]-entry)/entry*100);
+    const rr = (reward/risk).toFixed(2);
+
+    const exists = activeSignals.some(s => s.pair === symbol+'/USDT' && s.status === 'active');
+    if (exists) continue;
+
+    const signal = {
+      id: Date.now() + '_' + symbol,
+      pair: symbol + '/USDT',
+      direction,
+      entry: entry.toFixed(5),
+      stop: stop.toFixed(5),
+      targets: targets.map(t => t.toFixed(5)),
+      leverage,
+      rr,
+      risk: risk.toFixed(2),
+      reward: reward.toFixed(2),
+      confidence,
+      indicators,
+      timestamp: new Date().toISOString(),
+      status: 'active',
+      currentPnL: 0,
+      hitTarget: null
+    };
+
+    newSignals.push(signal);
+    activeSignals.push(signal);
+    log(`🎯 NEW SIGNAL: ${signal.pair} ${signal.direction} (confidence: ${confidence}%)`);
+  }
+
+  if (newSignals.length > 0) {
+    renderSignals();
+    updateAIRecommendation();
+  }
+}
+
+// ========== MONITOR SIGNALS ==========
+function monitorSignals() {
+  let changed = false;
+  activeSignals.forEach(sig => {
+    if (sig.status !== 'active') return;
+    const coinId = Object.entries(COINS).find(([k,v]) => v === sig.pair.replace('/USDT',''))?.[0];
+    if (!coinId || !prices[coinId]) return;
+
+    const current = prices[coinId].usd;
+    const entry = parseFloat(sig.entry);
+    const stop = parseFloat(sig.stop);
+    const isLong = sig.direction === 'Long';
+
+    const pnl = isLong ? ((current - entry)/entry*100) : ((entry - current)/entry*100);
+    sig.currentPnL = pnl;
+
+    for (let i=0; i<sig.targets.length; i++) {
+      const t = parseFloat(sig.targets[i]);
+      const hit = isLong ? current >= t : current <= t;
+      if (hit && !sig.hitTarget) {
+        sig.hitTarget = i+1;
+        sig.status = 'closed_win';
+        sig.closePrice = current.toFixed(5);
+        sig.closeTime = new Date().toISOString();
+        sig.finalPnL = (pnl * sig.leverage).toFixed(2);
+        signalHistory.push({...sig});
+        saveHistory();
+        log(`✅ TARGET ${i+1} HIT: ${sig.pair} ${sig.direction} — PnL: ${sig.finalPnL}%`);
+        changed = true;
+        break;
+      }
+    }
+
+    if (sig.status === 'active') {
+      const stopped = isLong ? current <= stop : current >= stop;
+      if (stopped) {
+        sig.status = 'closed_loss';
+        sig.closePrice = current.toFixed(5);
+        sig.closeTime = new Date().toISOString();
+        sig.finalPnL = (pnl * sig.leverage).toFixed(2);
+        signalHistory.push({...sig});
+        saveHistory();
+        log(`❌ STOP LOSS: ${sig.pair} ${sig.direction} — PnL: ${sig.finalPnL}%`);
+        changed = true;
+      }
+    }
+  });
+
+  activeSignals = activeSignals.filter(s => s.status === 'active');
+  if (changed) {
+    renderSignals();
+    renderHistory();
+    updateAnalytics();
+    updateAIRecommendation();
+  }
+}
+
+// ========== RENDER SIGNALS ==========
+function renderSignals() {
+  const container = document.getElementById('signals-list');
+  if (activeSignals.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:#90a4ae;padding:30px;">No active signals. Waiting for market conditions...</p>';
+    return;
+  }
+
+  container.innerHTML = activeSignals.map(sig => {
+    const dirCls = sig.direction === 'Short' ? 'short' : 'long';
+    const badgeCls = sig.direction === 'Short' ? 'dir-short' : 'dir-long';
+    const emoji = sig.direction === 'Short' ? '🔴' : '🟢';
+    const pnlCls = sig.currentPnL >= 0 ? 'pnl-pos' : 'pnl-neg';
+    const pnlIcon = sig.currentPnL >= 0 ? '▲' : '▼';
+
+    const coinId = Object.entries(COINS).find(([k,v]) => v === sig.pair.replace('/USDT',''))?.[0];
+    const current = coinId && prices[coinId] ? prices[coinId].usd : parseFloat(sig.entry);
+    const entry = parseFloat(sig.entry);
+    const t1 = parseFloat(sig.targets[0]);
+    let progress = 0;
+    if (sig.direction === 'Long') {
+      progress = Math.max(0, Math.min(100, ((current - entry) / (t1 - entry)) * 100));
+    } else {
+      progress = Math.max(0, Math.min(100, ((entry - current) / (entry - t1)) * 100));
+    }
+
+    const targetHtml = sig.targets.map((t,i) => {
+      const hit = sig.hitTarget && i < sig.hitTarget;
+      const cls = hit ? 'target-hit' : '';
+      return `<div class="target-box ${cls}"><div class="t-label">T${i+1}</div><div class="t-price">${t}</div></div>`;
+    }).join('');
+
+    const indHtml = sig.indicators.map(ind => {
+      const icls = ind.includes('bull') || ind.includes('up') || ind.includes('oversold') ? 'ind-bull' : 
+                   ind.includes('bear') || ind.includes('down') || ind.includes('overbought') ? 'ind-bear' : 'ind-neut';
+      return `<span class="ind-tag ${icls}">${ind}</span>`;
+    }).join('');
+
+    return `
+      <div class="signal-card ${dirCls}">
+        <div class="signal-header">
+          <span style="font-size:18px;font-weight:bold;color:#fff">${sig.pair}</span>
+          <span class="direction-badge ${badgeCls}">${emoji} ${sig.direction}</span>
+        </div>
+        <div class="indicator-row">${indHtml}</div>
+        <div class="field-row" style="margin-top:8px">
+          <div class="field"><div class="field-label">📍 Entry</div><div class="field-value val-entry">${sig.entry}</div></div>
+          <div class="field"><div class="field-label">🛑 Stop Loss</div><div class="field-value val-stop">${sig.stop}</div></div>
+        </div>
+        <div class="targets">${targetHtml}</div>
+        <div class="field-row">
+          <div class="field"><div class="field-label">⚡ Leverage</div><div class="field-value val-lev">x${sig.leverage}</div></div>
+          <div class="field"><div class="field-label">🎯 Confidence</div><div class="field-value val-lev">${sig.confidence}%</div></div>
+        </div>
+        <div class="monitor-bar">
+          <span class="monitor-status mon-active">● ACTIVE</span>
+          <div class="progress-track"><div class="progress-fill ${pnlCls}" style="width:${progress}%"></div></div>
+          <span class="${pnlCls}">${pnlIcon} ${sig.currentPnL.toFixed(2)}% (x${sig.leverage} = ${(sig.currentPnL*sig.leverage).toFixed(2)}%)</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ========== HISTORY & ANALYTICS ==========
+function renderHistory() {
+  const container = document.getElementById('history-list');
+  if (signalHistory.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:#90a4ae;padding:20px;">No closed signals yet.</p>';
+    return;
+  }
+
+  const recent = [...signalHistory].reverse().slice(0, 30);
+  container.innerHTML = recent.map(sig => {
+    const isWin = sig.status === 'closed_win';
+    const pnl = parseFloat(sig.finalPnL);
+    const pnlCls = pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+    const icon = isWin ? '✅' : '❌';
+    const date = new Date(sig.closeTime || sig.timestamp).toLocaleDateString();
+    return `
+      <div class="signal-card" style="opacity:.8">
+        <div class="signal-header">
+          <span style="font-size:16px;font-weight:bold">${icon} ${sig.pair} ${sig.direction}</span>
+          <span class="${pnlCls}" style="font-size:16px;font-weight:bold">${pnl >= 0 ? '+' : ''}${pnl}%</span>
+        </div>
+        <div style="font-size:11px;color:#78909c">
+          ${date} | Entry: ${sig.entry} → Close: ${sig.closePrice} | ${sig.hitTarget ? 'Target '+sig.hitTarget+' hit' : 'Stop loss'} | x${sig.leverage}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateAnalytics() {
+  const total = signalHistory.length;
+  const wins = signalHistory.filter(s => s.status === 'closed_win').length;
+  const winRate = total > 0 ? ((wins/total)*100).toFixed(1) : 0;
+  const avgPnL = total > 0 ? (signalHistory.reduce((a,s) => a + parseFloat(s.finalPnL), 0) / total).toFixed(2) : 0;
+  const avgRR = total > 0 ? (signalHistory.reduce((a,s) => a + parseFloat(s.rr), 0) / total).toFixed(2) : 0;
+
+  const pairStats = {};
+  signalHistory.forEach(s => {
+    if (!pairStats[s.pair]) pairStats[s.pair] = {pnl:0, count:0};
+    pairStats[s.pair].pnl += parseFloat(s.finalPnL);
+    pairStats[s.pair].count++;
+  });
+  let bestPair = '-';
+  let bestPnL = -Infinity;
+  for (const [pair, stat] of Object.entries(pairStats)) {
+    const avg = stat.pnl / stat.count;
+    if (avg > bestPnL) { bestPnL = avg; bestPair = pair; }
+  }
+
+  document.getElementById('total-signals').textContent = total;
+  document.getElementById('win-rate').textContent = winRate + '%';
+  document.getElementById('win-rate').style.color = winRate > 50 ? '#00e676' : '#ff5252';
+  document.getElementById('avg-rr').textContent = avgRR;
+  document.getElementById('avg-pnl').textContent = (avgPnL >= 0 ? '+' : '') + avgPnL + '%';
+  document.getElementById('avg-pnl').style.color = avgPnL >= 0 ? '#00e676' : '#ff5252';
+  document.getElementById('best-pair').textContent = bestPair;
+}
+
+// ========== AI RECOMMENDATION ==========
+function updateAIRecommendation() {
+  const rec = document.getElementById('ai-rec');
+
+  if (signalHistory.length < 3) {
+    rec.innerHTML = `<b>Learning Phase:</b> ${signalHistory.length} signals recorded. Need 3+ for pattern recognition. Active: ${activeSignals.length}`;
+    return;
+  }
+
+  const wins = signalHistory.filter(s => s.status === 'closed_win');
+  const winRate = (wins.length / signalHistory.length * 100).toFixed(1);
+
+  const indPerf = {};
+  signalHistory.forEach(s => {
+    s.indicators.forEach(ind => {
+      if (!indPerf[ind]) indPerf[ind] = {wins:0, total:0, pnl:0};
+      indPerf[ind].total++;
+      if (s.status === 'closed_win') indPerf[ind].wins++;
+      indPerf[ind].pnl += parseFloat(s.finalPnL);
+    });
+  });
+
+  let bestInd = null;
+  let bestIndScore = -Infinity;
+  for (const [ind, stat] of Object.entries(indPerf)) {
+    if (stat.total < 2) continue;
+    const score = (stat.wins/stat.total) * 100 + (stat.pnl/stat.total);
+    if (score > bestIndScore) { bestIndScore = score; bestInd = ind; }
+  }
+
+  const longs = signalHistory.filter(s => s.direction === 'Long');
+  const shorts = signalHistory.filter(s => s.direction === 'Short');
+  const longWR = longs.length > 0 ? (longs.filter(s => s.status === 'closed_win').length / longs.length * 100).toFixed(1) : 0;
+  const shortWR = shorts.length > 0 ? (shorts.filter(s => s.status === 'closed_win').length / shorts.length * 100).toFixed(1) : 0;
+
+  const levGroups = {'low':{total:0,wins:0},'mid':{total:0,wins:0},'high':{total:0,wins:0}};
+  signalHistory.forEach(s => {
+    const g = s.leverage <= 5 ? 'low' : s.leverage <= 12 ? 'mid' : 'high';
+    levGroups[g].total++;
+    if (s.status === 'closed_win') levGroups[g].wins++;
+  });
+  let bestLev = 'low';
+  let bestLevWR = 0;
+  for (const [g, stat] of Object.entries(levGroups)) {
+    if (stat.total === 0) continue;
+    const wr = stat.wins/stat.total*100;
+    if (wr > bestLevWR) { bestLevWR = wr; bestLev = g; }
+  }
+  const levText = bestLev === 'low' ? '3-5x' : bestLev === 'mid' ? '6-12x' : '13-20x';
+
+  rec.innerHTML = `
+    <b>📊 Analysis (${signalHistory.length} signals):</b><br>
+    • Win Rate: <b>${winRate}%</b> | Best Direction: <b>${longWR > shortWR ? 'Long' : 'Short'} (${Math.max(longWR,shortWR)}% WR)</b><br>
+    • Best Indicator: <b>${bestInd || 'N/A'}</b> | Optimal Leverage: <b>${levText}</b><br>
+    • Active: <b>${activeSignals.length}</b> | 
+    <b style="color:${winRate > 55 ? '#00e676' : '#ffd700'}">${winRate > 55 ? 'Strategy performing well' : 'Adjusting parameters'}</b>
+  `;
+}
+
+// ========== TABS ==========
+function showTab(tab) {
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-prices').classList.toggle('hidden', tab !== 'prices');
+  document.getElementById('tab-signals').classList.toggle('hidden', tab !== 'signals');
+  document.getElementById('tab-history').classList.toggle('hidden', tab !== 'history');
+  if (tab === 'signals') renderSignals();
+  if (tab === 'history') { renderHistory(); updateAnalytics(); }
+}
+
+function forceRefresh() {
+  log('Manual refresh triggered...');
+  fetchPrices().then(() => generateSignals());
+}
+
+// ========== MAIN ==========
+async function init() {
+  log('Starting Live Crypto Signal Monitor...');
+  loadHistory();
+  updateStorageInfo();
+
+  log('Connecting to CoinGecko API (public-apis: free, no auth, CORS)...');
+  const ok = await fetchPrices();
+
+  if (ok) {
+    isRunning = true;
+    log('System online. Monitoring loops active.');
+
+    setInterval(() => { if (isRunning) fetchPrices(); }, UPDATE_INTERVAL);
+    setInterval(() => { if (isRunning) generateSignals(); }, SIGNAL_INTERVAL);
+
+    setTimeout(() => { generateSignals(); }, 3000);
+  } else {
+    log('Init failed. Retrying in 30s...');
+    setTimeout(init, 30000);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
