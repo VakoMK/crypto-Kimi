@@ -15,6 +15,8 @@
   .status-pill{padding:6px 14px;border-radius:20px;font-size:12px;background:#12182b;border:1px solid #1a237e}
   .status-pill.live{border-color:#00e676;color:#00e676;animation:pulse 2s infinite}
   .status-pill.error{border-color:#ff5252;color:#ff5252}
+  .status-pill.notify-on{border-color:#00e676;color:#00e676}
+  .status-pill.notify-off{border-color:#ff5252;color:#ff5252}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
   .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:12px;background:#12182b;border-radius:10px;justify-content:center}
   .btn{padding:8px 16px;border:1px solid #283593;background:#1a237e;color:#c5cae9;border-radius:8px;cursor:pointer;font-size:12px;transition:all .2s}
@@ -22,6 +24,8 @@
   .btn.active{background:#ffd700;color:#0a0e1a;border-color:#ffd700;font-weight:bold}
   .btn.danger{background:#b71c1c;border-color:#ff5252;color:#ff8a80}
   .btn.danger:hover{background:#ff5252;color:#fff}
+  .btn.notify-btn{background:#1b5e20;border-color:#00e676;color:#69f0ae}
+  .btn.notify-btn:hover{background:#00e676;color:#0a0e1a}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:20px}
   .price-card{background:#12182b;border:1px solid #1a237e;border-radius:10px;padding:12px;transition:all .2s}
   .price-card:hover{border-color:#ffd700}
@@ -74,6 +78,10 @@
   .disclaimer strong{color:#ffd700}
   .storage-info{background:#0d1b2a;border:1px solid #1a237e;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:#90a4ae;text-align:center}
   .storage-info strong{color:#00e676}
+  .notify-banner{background:#1b5e20;border:1px solid #00e676;border-radius:10px;padding:12px;margin-bottom:16px;text-align:center;display:none}
+  .notify-banner.show{display:block}
+  .notify-banner h3{color:#69f0ae;margin:0 0 6px;font-size:14px}
+  .notify-banner p{color:#c5cae9;font-size:12px;margin:0 0 8px}
   @media(max-width:600px){.grid{grid-template-columns:repeat(2,1fr)}.field-row{grid-template-columns:1fr}}
 </style>
 </head>
@@ -81,11 +89,18 @@
 <div class="container">
   <div class="header">
     <h1>🔮 Live Crypto Signal Monitor</h1>
-    <p>Real-time via CoinGecko API (public-apis) • Technical Analysis • Persistent History</p>
+    <p>Real-time via CoinGecko API • Push Notifications • Persistent History</p>
   </div>
 
   <div class="disclaimer">
     <strong>⚠️ NOT FINANCIAL ADVICE</strong> — Demo signals for educational purposes. DYOR.
+  </div>
+
+  <div class="notify-banner" id="notify-banner">
+    <h3>🔔 Push Notifications</h3>
+    <p>Get instant alerts when new signals are generated or targets are hit — even when the tab is closed!</p>
+    <button class="btn notify-btn" onclick="requestNotificationPermission()">✅ Enable Notifications</button>
+    <button class="btn" onclick="testNotification()">🧪 Test Notification</button>
   </div>
 
   <div class="storage-info" id="storage-info">
@@ -97,6 +112,7 @@
     <div class="status-pill live" id="status-pill">● LIVE — 60s refresh</div>
     <div class="status-pill" id="last-update">Last update: --</div>
     <div class="status-pill" id="api-status">API: Connecting...</div>
+    <div class="status-pill notify-off" id="notify-status">🔕 Notifications: Off</div>
   </div>
 
   <div class="recommendation">
@@ -164,6 +180,79 @@ let activeSignals = [];
 let signalHistory = [];
 let lastSignalGen = 0;
 let isRunning = false;
+let notificationsEnabled = false;
+
+// ========== NOTIFICATIONS ==========
+function checkNotificationSupport() {
+  if (!('Notification' in window)) {
+    log('❌ Browser does not support notifications');
+    return false;
+  }
+  if (Notification.permission === 'granted') {
+    notificationsEnabled = true;
+    updateNotifyStatus();
+    return true;
+  }
+  // Show banner to request permission
+  document.getElementById('notify-banner').classList.add('show');
+  return false;
+}
+
+function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    alert('Your browser does not support push notifications.');
+    return;
+  }
+  Notification.requestPermission().then(permission => {
+    if (permission === 'granted') {
+      notificationsEnabled = true;
+      document.getElementById('notify-banner').classList.remove('show');
+      updateNotifyStatus();
+      sendNotification('🔮 Crypto Signal Monitor', 'Notifications enabled! You will now receive alerts for new signals and target hits.');
+      log('✅ Push notifications enabled');
+    } else {
+      log('❌ Notification permission denied');
+    }
+  });
+}
+
+function updateNotifyStatus() {
+  const el = document.getElementById('notify-status');
+  if (notificationsEnabled) {
+    el.textContent = '🔔 Notifications: ON';
+    el.className = 'status-pill notify-on';
+  } else {
+    el.textContent = '🔕 Notifications: Off';
+    el.className = 'status-pill notify-off';
+  }
+}
+
+function sendNotification(title, body, tag = 'crypto-signal') {
+  if (!notificationsEnabled || Notification.permission !== 'granted') return;
+  try {
+    new Notification(title, {
+      body: body,
+      icon: 'https://cdn-icons-png.flaticon.com/512/6134/6134347.png',
+      tag: tag,
+      requireInteraction: tag === 'crypto-signal',
+      silent: false
+    });
+  } catch (e) {
+    log('Notification error: ' + e.message);
+  }
+}
+
+function testNotification() {
+  if (Notification.permission !== 'granted') {
+    alert('Please enable notifications first!');
+    return;
+  }
+  sendNotification(
+    '🧪 Test Notification',
+    'If you see this, notifications are working! You will get alerts for: New signals, Target hits, Stop losses.',
+    'test'
+  );
+}
 
 // ========== LOCAL STORAGE ==========
 function saveHistory() {
@@ -478,6 +567,13 @@ function generateSignals() {
     newSignals.push(signal);
     activeSignals.push(signal);
     log(`🎯 NEW SIGNAL: ${signal.pair} ${signal.direction} (confidence: ${confidence}%)`);
+
+    // Send push notification
+    sendNotification(
+      `🎯 New ${signal.direction} Signal: ${signal.pair}`,
+      `Entry: ${signal.entry} | Stop: ${signal.stop} | Leverage: x${signal.leverage} | Confidence: ${confidence}%`,
+      'new-signal'
+    );
   }
 
   if (newSignals.length > 0) {
@@ -514,6 +610,13 @@ function monitorSignals() {
         signalHistory.push({...sig});
         saveHistory();
         log(`✅ TARGET ${i+1} HIT: ${sig.pair} ${sig.direction} — PnL: ${sig.finalPnL}%`);
+
+        sendNotification(
+          `✅ TARGET HIT: ${sig.pair} ${sig.direction}`,
+          `Target ${i+1} reached! PnL: +${sig.finalPnL}% | Entry: ${sig.entry} → Close: ${sig.closePrice}`,
+          'target-hit'
+        );
+
         changed = true;
         break;
       }
@@ -529,6 +632,13 @@ function monitorSignals() {
         signalHistory.push({...sig});
         saveHistory();
         log(`❌ STOP LOSS: ${sig.pair} ${sig.direction} — PnL: ${sig.finalPnL}%`);
+
+        sendNotification(
+          `❌ STOP LOSS: ${sig.pair} ${sig.direction}`,
+          `Stop loss hit. PnL: ${sig.finalPnL}% | Entry: ${sig.entry} → Close: ${sig.closePrice}`,
+          'stop-loss'
+        );
+
         changed = true;
       }
     }
@@ -745,6 +855,7 @@ async function init() {
   log('Starting Live Crypto Signal Monitor...');
   loadHistory();
   updateStorageInfo();
+  checkNotificationSupport();
 
   log('Connecting to CoinGecko API (public-apis: free, no auth, CORS)...');
   const ok = await fetchPrices();
